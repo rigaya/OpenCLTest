@@ -29,7 +29,7 @@
 #include "CL\cl.h"
 #include "utils.h"
 
-//for perf. counters
+ //for perf. counters
 #include <Windows.h>
 
 
@@ -42,10 +42,8 @@
  * representation for an OpenCL error code.
  * (E.g. "CL_DEVICE_NOT_FOUND" instead of just -1.)
  */
-const char* TranslateOpenCLError(cl_int errorCode)
-{
-    switch(errorCode)
-    {
+const char* TranslateOpenCLError(cl_int errorCode) {
+    switch (errorCode) {
     case CL_SUCCESS:                            return "CL_SUCCESS";
     case CL_DEVICE_NOT_FOUND:                   return "CL_DEVICE_NOT_FOUND";
     case CL_DEVICE_NOT_AVAILABLE:               return "CL_DEVICE_NOT_AVAILABLE";
@@ -124,8 +122,7 @@ const char* TranslateOpenCLError(cl_int errorCode)
  * only, there is no OpenCL specific here: just to avoid global variables
  * and make passing all these arguments in functions easier.
  */
-struct ocl_args_d_t
-{
+struct ocl_args_d_t {
     ocl_args_d_t();
     ~ocl_args_d_t();
 
@@ -138,26 +135,25 @@ struct ocl_args_d_t
     float            platformVersion;   // hold the OpenCL platform version (default 1.2)
     float            deviceVersion;     // hold the OpenCL device version (default. 1.2)
     float            compilerVersion;   // hold the device OpenCL C version (default. 1.2)
-    
+
     // Objects that are specific for algorithm implemented in this sample
     cl_mem           srcA;              // hold first source buffer
     cl_mem           srcB;              // hold second source buffer
     cl_mem           dstMem;            // hold destination buffer
 };
 
-ocl_args_d_t::ocl_args_d_t():
-        context(NULL),
-        device(NULL),
-        commandQueue(NULL),
-        program(NULL),
-        kernel(NULL),
-        platformVersion(OPENCL_VERSION_1_2),
-        deviceVersion(OPENCL_VERSION_1_2),
-        compilerVersion(OPENCL_VERSION_1_2),
-        srcA(NULL),
-        srcB(NULL),
-        dstMem(NULL)
-{
+ocl_args_d_t::ocl_args_d_t() :
+    context(NULL),
+    device(NULL),
+    commandQueue(NULL),
+    program(NULL),
+    kernel(NULL),
+    platformVersion(OPENCL_VERSION_1_2),
+    deviceVersion(OPENCL_VERSION_1_2),
+    compilerVersion(OPENCL_VERSION_1_2),
+    srcA(NULL),
+    srcB(NULL),
+    dstMem(NULL) {
 }
 
 /*
@@ -171,77 +167,60 @@ ocl_args_d_t::ocl_args_d_t():
  * or recreate OpenCL objects with different parameters.
  *
  */
-ocl_args_d_t::~ocl_args_d_t()
-{
+ocl_args_d_t::~ocl_args_d_t() {
     cl_int err = CL_SUCCESS;
 
-    if (kernel)
-    {
+    if (kernel) {
         err = clReleaseKernel(kernel);
-        if (CL_SUCCESS != err)
-        {
+        if (CL_SUCCESS != err) {
             LogError("Error: clReleaseKernel returned '%s'.\n", TranslateOpenCLError(err));
         }
     }
-    if (program)
-    {
+    if (program) {
         err = clReleaseProgram(program);
-        if (CL_SUCCESS != err)
-        {
+        if (CL_SUCCESS != err) {
             LogError("Error: clReleaseProgram returned '%s'.\n", TranslateOpenCLError(err));
         }
     }
-    if (srcA)
-    {
+    if (srcA) {
         err = clReleaseMemObject(srcA);
-        if (CL_SUCCESS != err)
-        {
+        if (CL_SUCCESS != err) {
             LogError("Error: clReleaseMemObject returned '%s'.\n", TranslateOpenCLError(err));
         }
     }
-    if (srcB)
-    {
+    if (srcB) {
         err = clReleaseMemObject(srcB);
-        if (CL_SUCCESS != err)
-        {
+        if (CL_SUCCESS != err) {
             LogError("Error: clReleaseMemObject returned '%s'.\n", TranslateOpenCLError(err));
         }
     }
-    if (dstMem)
-    {
+    if (dstMem) {
         err = clReleaseMemObject(dstMem);
-        if (CL_SUCCESS != err)
-        {
+        if (CL_SUCCESS != err) {
             LogError("Error: clReleaseMemObject returned '%s'.\n", TranslateOpenCLError(err));
         }
     }
-    if (commandQueue)
-    {
+    if (commandQueue) {
         err = clReleaseCommandQueue(commandQueue);
-        if (CL_SUCCESS != err)
-        {
+        if (CL_SUCCESS != err) {
             LogError("Error: clReleaseCommandQueue returned '%s'.\n", TranslateOpenCLError(err));
         }
     }
-    if (device)
-    {
+    if (device) {
         err = clReleaseDevice(device);
-        if (CL_SUCCESS != err)
-        {
+        if (CL_SUCCESS != err) {
             LogError("Error: clReleaseDevice returned '%s'.\n", TranslateOpenCLError(err));
         }
     }
-    if (context)
-    {
+    if (context) {
         err = clReleaseContext(context);
-        if (CL_SUCCESS != err)
-        {
+        if (CL_SUCCESS != err) {
             LogError("Error: clReleaseContext returned '%s'.\n", TranslateOpenCLError(err));
         }
     }
 
     /*
-     * Note there is no procedure to deallocate platform 
+     * Note there is no procedure to deallocate platform
      * because it was not created at the startup,
      * but just queried from OpenCL runtime.
      */
@@ -252,8 +231,7 @@ ocl_args_d_t::~ocl_args_d_t()
  * Check whether an OpenCL platform is the required platform
  * (based on the platform's name)
  */
-bool CheckPreferredPlatformMatch(cl_platform_id platform, const char* preferredPlatform)
-{
+bool CheckPreferredPlatformMatch(cl_platform_id platform, const char* preferredPlatform) {
     size_t stringLength = 0;
     cl_int err = CL_SUCCESS;
     bool match = false;
@@ -261,8 +239,7 @@ bool CheckPreferredPlatformMatch(cl_platform_id platform, const char* preferredP
     // In order to read the platform's name, we first read the platform's name string length (param_value is NULL).
     // The value returned in stringLength
     err = clGetPlatformInfo(platform, CL_PLATFORM_NAME, 0, NULL, &stringLength);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clGetPlatformInfo() to get CL_PLATFORM_NAME length returned '%s'.\n", TranslateOpenCLError(err));
         return false;
     }
@@ -273,15 +250,13 @@ bool CheckPreferredPlatformMatch(cl_platform_id platform, const char* preferredP
     // Read the platform's name string
     // The read value returned in platformName
     err = clGetPlatformInfo(platform, CL_PLATFORM_NAME, stringLength, &platformName[0], NULL);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clGetplatform_ids() to get CL_PLATFORM_NAME returned %s.\n", TranslateOpenCLError(err));
         return false;
     }
-    
+
     // Now check if the platform's name is the required one
-    if (strstr(&platformName[0], preferredPlatform) != 0)
-    {
+    if (strstr(&platformName[0], preferredPlatform) != 0) {
         // The checked platform is the one we're looking for
         match = true;
     }
@@ -293,23 +268,20 @@ bool CheckPreferredPlatformMatch(cl_platform_id platform, const char* preferredP
  * Find and return the preferred OpenCL platform
  * In case that preferredPlatform is NULL, the ID of the first discovered platform will be returned
  */
-cl_platform_id FindOpenCLPlatform(const char* preferredPlatform, cl_device_type deviceType)
-{
+cl_platform_id FindOpenCLPlatform(const char* preferredPlatform, cl_device_type deviceType) {
     cl_uint numPlatforms = 0;
     cl_int err = CL_SUCCESS;
 
     // Get (in numPlatforms) the number of OpenCL platforms available
     // No platform ID will be return, since platforms is NULL
     err = clGetPlatformIDs(0, NULL, &numPlatforms);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clGetplatform_ids() to get num platforms returned %s.\n", TranslateOpenCLError(err));
         return NULL;
     }
     LogInfo("Number of available platforms: %u\n", numPlatforms);
 
-    if (0 == numPlatforms)
-    {
+    if (0 == numPlatforms) {
         LogError("Error: No platforms found!\n");
         return NULL;
     }
@@ -319,41 +291,35 @@ cl_platform_id FindOpenCLPlatform(const char* preferredPlatform, cl_device_type 
     // Now, obtains a list of numPlatforms OpenCL platforms available
     // The list of platforms available will be returned in platforms
     err = clGetPlatformIDs(numPlatforms, &platforms[0], NULL);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clGetplatform_ids() to get platforms returned %s.\n", TranslateOpenCLError(err));
         return NULL;
     }
 
     // Check if one of the available platform matches the preferred requirements
-    for (cl_uint i = 0; i < numPlatforms; i++)
-    {
+    for (cl_uint i = 0; i < numPlatforms; i++) {
         bool match = true;
         cl_uint numDevices = 0;
 
         // If the preferredPlatform is not NULL then check if platforms[i] is the required one
         // Otherwise, continue the check with platforms[i]
-        if ((NULL != preferredPlatform) && (strlen(preferredPlatform) > 0))
-        {
+        if ((NULL != preferredPlatform) && (strlen(preferredPlatform) > 0)) {
             // In case we're looking for a specific platform
             match = CheckPreferredPlatformMatch(platforms[i], preferredPlatform);
         }
 
         // match is true if the platform's name is the required one or don't care (NULL)
-        if (match)
-        {
+        if (match) {
             // Obtains the number of deviceType devices available on platform
             // When the function failed we expect numDevices to be zero.
             // We ignore the function return value since a non-zero error code
             // could happen if this platform doesn't support the specified device type.
             err = clGetDeviceIDs(platforms[i], deviceType, 0, NULL, &numDevices);
-            if (CL_SUCCESS != err)
-            {
+            if (CL_SUCCESS != err) {
                 LogError("clGetDeviceIDs() returned %s.\n", TranslateOpenCLError(err));
             }
 
-            if (0 != numDevices)
-            {
+            if (0 != numDevices) {
                 // There is at list one device that answer the requirements
                 return platforms[i];
             }
@@ -370,16 +336,14 @@ cl_platform_id FindOpenCLPlatform(const char* preferredPlatform, cl_device_type 
  * Later it will enable us to support both OpenCL 1.2 and 2.0 platforms and devices
  * in the same program.
  */
-int GetPlatformAndDeviceVersion (cl_platform_id platformId, ocl_args_d_t *ocl)
-{
+int GetPlatformAndDeviceVersion(cl_platform_id platformId, ocl_args_d_t *ocl) {
     cl_int err = CL_SUCCESS;
 
     // Read the platform's version string length (param_value is NULL).
     // The value returned in stringLength
     size_t stringLength = 0;
     err = clGetPlatformInfo(platformId, CL_PLATFORM_VERSION, 0, NULL, &stringLength);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clGetPlatformInfo() to get CL_PLATFORM_VERSION length returned '%s'.\n", TranslateOpenCLError(err));
         return err;
     }
@@ -390,21 +354,18 @@ int GetPlatformAndDeviceVersion (cl_platform_id platformId, ocl_args_d_t *ocl)
     // Read the platform's version string
     // The read value returned in platformVersion
     err = clGetPlatformInfo(platformId, CL_PLATFORM_VERSION, stringLength, &platformVersion[0], NULL);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clGetplatform_ids() to get CL_PLATFORM_VERSION returned %s.\n", TranslateOpenCLError(err));
         return err;
     }
 
-    if (strstr(&platformVersion[0], "OpenCL 2.0") != NULL)
-    {
+    if (strstr(&platformVersion[0], "OpenCL 2.0") != NULL) {
         ocl->platformVersion = OPENCL_VERSION_2_0;
     }
 
     // Read the device's version string length (param_value is NULL).
     err = clGetDeviceInfo(ocl->device, CL_DEVICE_VERSION, 0, NULL, &stringLength);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clGetDeviceInfo() to get CL_DEVICE_VERSION length returned '%s'.\n", TranslateOpenCLError(err));
         return err;
     }
@@ -415,21 +376,18 @@ int GetPlatformAndDeviceVersion (cl_platform_id platformId, ocl_args_d_t *ocl)
     // Read the device's version string
     // The read value returned in deviceVersion
     err = clGetDeviceInfo(ocl->device, CL_DEVICE_VERSION, stringLength, &deviceVersion[0], NULL);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clGetDeviceInfo() to get CL_DEVICE_VERSION returned %s.\n", TranslateOpenCLError(err));
         return err;
     }
 
-    if (strstr(&deviceVersion[0], "OpenCL 2.0") != NULL)
-    {
+    if (strstr(&deviceVersion[0], "OpenCL 2.0") != NULL) {
         ocl->deviceVersion = OPENCL_VERSION_2_0;
     }
 
     // Read the device's OpenCL C version string length (param_value is NULL).
     err = clGetDeviceInfo(ocl->device, CL_DEVICE_OPENCL_C_VERSION, 0, NULL, &stringLength);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clGetDeviceInfo() to get CL_DEVICE_OPENCL_C_VERSION length returned '%s'.\n", TranslateOpenCLError(err));
         return err;
     }
@@ -440,14 +398,12 @@ int GetPlatformAndDeviceVersion (cl_platform_id platformId, ocl_args_d_t *ocl)
     // Read the device's OpenCL C version string
     // The read value returned in compilerVersion
     err = clGetDeviceInfo(ocl->device, CL_DEVICE_OPENCL_C_VERSION, stringLength, &compilerVersion[0], NULL);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clGetDeviceInfo() to get CL_DEVICE_OPENCL_C_VERSION returned %s.\n", TranslateOpenCLError(err));
         return err;
     }
 
-    else if (strstr(&compilerVersion[0], "OpenCL C 2.0") != NULL)
-    {
+    else if (strstr(&compilerVersion[0], "OpenCL C 2.0") != NULL) {
         ocl->compilerVersion = OPENCL_VERSION_2_0;
     }
 
@@ -458,14 +414,12 @@ int GetPlatformAndDeviceVersion (cl_platform_id platformId, ocl_args_d_t *ocl)
 /*
  * Generate random value for input buffers
  */
-void generateInput(cl_int* inputArray, cl_uint arrayWidth, cl_uint arrayHeight)
-{
+void generateInput(cl_int* inputArray, cl_uint arrayWidth, cl_uint arrayHeight) {
     srand(12345);
 
     // random initialization of input
     cl_uint array_size = arrayWidth * arrayHeight;
-    for (cl_uint i = 0; i < array_size; ++i)
-    {
+    for (cl_uint i = 0; i < array_size; ++i) {
         inputArray[i] = rand();
     }
 }
@@ -484,16 +438,14 @@ void generateInput(cl_int* inputArray, cl_uint arrayWidth, cl_uint arrayHeight)
  * Please, consider reviewing the fields before going further.
  * The structure definition is right in the beginning of this file.
  */
-int SetupOpenCL(ocl_args_d_t *ocl, cl_device_type deviceType)
-{
+int SetupOpenCL(ocl_args_d_t *ocl, cl_device_type deviceType) {
     // The following variable stores return codes for all OpenCL calls.
     cl_int err = CL_SUCCESS;
 
     // Query for all available OpenCL platforms on the system
     // Here you enumerate all platforms and pick one which name has preferredPlatform as a sub-string
     cl_platform_id platformId = FindOpenCLPlatform("Intel", deviceType);
-    if (NULL == platformId)
-    {
+    if (NULL == platformId) {
         LogError("Error: Failed to find OpenCL platform.\n");
         return CL_INVALID_VALUE;
     }
@@ -502,18 +454,16 @@ int SetupOpenCL(ocl_args_d_t *ocl, cl_device_type deviceType)
     // Required device type is passed as function argument deviceType.
     // So you may use this function to create context for any CPU or GPU OpenCL device.
     // The creation is synchronized (pfn_notify is NULL) and NULL user_data
-    cl_context_properties contextProperties[] = {CL_CONTEXT_PLATFORM, (cl_context_properties)platformId, 0};
+    cl_context_properties contextProperties[] ={ CL_CONTEXT_PLATFORM, (cl_context_properties)platformId, 0 };
     ocl->context = clCreateContextFromType(contextProperties, deviceType, NULL, NULL, &err);
-    if ((CL_SUCCESS != err) || (NULL == ocl->context))
-    {
+    if ((CL_SUCCESS != err) || (NULL == ocl->context)) {
         LogError("Couldn't create a context, clCreateContextFromType() returned '%s'.\n", TranslateOpenCLError(err));
         return err;
     }
 
     // Query for OpenCL device which was used for context creation
     err = clGetContextInfo(ocl->context, CL_CONTEXT_DEVICES, sizeof(cl_device_id), &ocl->device, NULL);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clGetContextInfo() to get list of devices returned %s.\n", TranslateOpenCLError(err));
         return err;
     }
@@ -526,23 +476,20 @@ int SetupOpenCL(ocl_args_d_t *ocl, cl_device_type deviceType)
     // Command queue guarantees some ordering between calls and other OpenCL commands.
     // Here you create a simple in-order OpenCL command queue that doesn't allow execution of two kernels in parallel on a target device.
 #ifdef CL_VERSION_2_0
-    if (OPENCL_VERSION_2_0 == ocl->deviceVersion)
-    {
-        const cl_command_queue_properties properties[] = {CL_QUEUE_PROPERTIES, CL_QUEUE_PROFILING_ENABLE, 0};
+    if (OPENCL_VERSION_2_0 == ocl->deviceVersion) {
+        const cl_command_queue_properties properties[] ={ CL_QUEUE_PROPERTIES, CL_QUEUE_PROFILING_ENABLE, 0 };
         ocl->commandQueue = clCreateCommandQueueWithProperties(ocl->context, ocl->device, properties, &err);
-    } 
-    else {
+    } else {
         // default behavior: OpenCL 1.2
         cl_command_queue_properties properties = CL_QUEUE_PROFILING_ENABLE;
         ocl->commandQueue = clCreateCommandQueue(ocl->context, ocl->device, properties, &err);
-    } 
+    }
 #else
     // default behavior: OpenCL 1.2
     cl_command_queue_properties properties = CL_QUEUE_PROFILING_ENABLE;
     ocl->commandQueue = clCreateCommandQueue(ocl->context, ocl->device, properties, &err);
 #endif
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clCreateCommandQueue() returned %s.\n", TranslateOpenCLError(err));
         return err;
     }
@@ -551,11 +498,10 @@ int SetupOpenCL(ocl_args_d_t *ocl, cl_device_type deviceType)
 }
 
 
-/* 
+/*
  * Create and build OpenCL program from its source code
  */
-int CreateAndBuildProgram(ocl_args_d_t *ocl)
-{
+int CreateAndBuildProgram(ocl_args_d_t *ocl) {
     cl_int err = CL_SUCCESS;
 
     // Upload the OpenCL C source code from the input file to source
@@ -563,16 +509,14 @@ int CreateAndBuildProgram(ocl_args_d_t *ocl)
     char* source = NULL;
     size_t src_size = 0;
     err = ReadSourceFromFile("Template.cl", &source, &src_size);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: ReadSourceFromFile returned %s.\n", TranslateOpenCLError(err));
         goto Finish;
     }
 
     // And now after you obtained a regular C string call clCreateProgramWithSource to create OpenCL program object.
     ocl->program = clCreateProgramWithSource(ocl->context, 1, (const char**)&source, &src_size, &err);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clCreateProgramWithSource returned %s.\n", TranslateOpenCLError(err));
         goto Finish;
     }
@@ -584,15 +528,13 @@ int CreateAndBuildProgram(ocl_args_d_t *ocl)
     // some of which are libraries, and you may want to consider using clCompileProgram and clLinkProgram as
     // alternatives.
     err = clBuildProgram(ocl->program, 1, &ocl->device, "", NULL, NULL);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clBuildProgram() for source program returned %s.\n", TranslateOpenCLError(err));
 
         // In case of error print the build log to the standard output
         // First check the size of the log
         // Then allocate the memory and obtain the log from the program
-        if (err == CL_BUILD_PROGRAM_FAILURE)
-        {
+        if (err == CL_BUILD_PROGRAM_FAILURE) {
             size_t log_size = 0;
             clGetProgramBuildInfo(ocl->program, ocl->device, CL_PROGRAM_BUILD_LOG, 0, NULL, &log_size);
 
@@ -604,8 +546,7 @@ int CreateAndBuildProgram(ocl_args_d_t *ocl)
     }
 
 Finish:
-    if (source)
-    {
+    if (source) {
         delete[] source;
         source = NULL;
     }
@@ -618,8 +559,7 @@ Finish:
  * Create OpenCL buffers from host memory
  * These buffers will be used later by the OpenCL kernel
  */
-int CreateBufferArguments(ocl_args_d_t *ocl, cl_int* inputA, cl_int* inputB, cl_int* outputC, cl_uint arrayWidth, cl_uint arrayHeight)
-{
+int CreateBufferArguments(ocl_args_d_t *ocl, cl_int* inputA, cl_int* inputB, cl_int* outputC, cl_uint arrayWidth, cl_uint arrayHeight) {
     cl_int err = CL_SUCCESS;
 
     // Create new OpenCL buffer objects
@@ -629,15 +569,13 @@ int CreateBufferArguments(ocl_args_d_t *ocl, cl_int* inputA, cl_int* inputB, cl_
     // You use CL_MEM_COPY_HOST_PTR here, because the buffers should be populated with bytes at inputA and inputB.
 
     ocl->srcA = clCreateBuffer(ocl->context, CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, sizeof(cl_uint) * arrayWidth * arrayHeight, inputA, &err);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clCreateBuffer for srcA returned %s\n", TranslateOpenCLError(err));
         return err;
     }
 
     ocl->srcB = clCreateBuffer(ocl->context, CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, sizeof(cl_uint) * arrayWidth * arrayHeight, inputB, &err);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clCreateBuffer for srcB returned %s\n", TranslateOpenCLError(err));
         return err;
     }
@@ -647,8 +585,7 @@ int CreateBufferArguments(ocl_args_d_t *ocl, cl_int* inputA, cl_int* inputB, cl_
     // it may save you not necessary data copying.
     // As it is known that output buffer will be write only, you explicitly declare it using CL_MEM_WRITE_ONLY.
     ocl->dstMem = clCreateBuffer(ocl->context, CL_MEM_WRITE_ONLY | CL_MEM_ALLOC_HOST_PTR, sizeof(cl_uint) * arrayWidth * arrayHeight, NULL, &err);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clCreateBuffer for dstMem returned %s\n", TranslateOpenCLError(err));
         return err;
     }
@@ -661,27 +598,23 @@ int CreateBufferArguments(ocl_args_d_t *ocl, cl_int* inputA, cl_int* inputB, cl_
 /*
  * Set kernel arguments
  */
-cl_uint SetKernelArguments(ocl_args_d_t *ocl)
-{
+cl_uint SetKernelArguments(ocl_args_d_t *ocl) {
     cl_int err = CL_SUCCESS;
 
     err  =  clSetKernelArg(ocl->kernel, 0, sizeof(cl_mem), (void *)&ocl->srcA);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("error: Failed to set argument srcA, returned %s\n", TranslateOpenCLError(err));
         return err;
     }
 
     err  = clSetKernelArg(ocl->kernel, 1, sizeof(cl_mem), (void *)&ocl->srcB);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: Failed to set argument srcB, returned %s\n", TranslateOpenCLError(err));
         return err;
     }
 
     err  = clSetKernelArg(ocl->kernel, 2, sizeof(cl_mem), (void *)&ocl->dstMem);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: Failed to set argument dstMem, returned %s\n", TranslateOpenCLError(err));
         return err;
     }
@@ -693,26 +626,23 @@ cl_uint SetKernelArguments(ocl_args_d_t *ocl)
 /*
  * Execute the kernel
  */
-cl_uint ExecuteAddKernel(ocl_args_d_t *ocl, cl_uint width, cl_uint height)
-{
+cl_uint ExecuteAddKernel(ocl_args_d_t *ocl, cl_uint width, cl_uint height) {
     cl_int err = CL_SUCCESS;
 
     // Define global iteration space for clEnqueueNDRangeKernel.
-    size_t globalWorkSize[2] = {width, height};
-    size_t localWorkSize[2] = {1, 1};
+    size_t globalWorkSize[2] ={ width, height };
+    size_t localWorkSize[2] ={ 1, 1 };
 
     // execute kernel
     err = clEnqueueNDRangeKernel(ocl->commandQueue, ocl->kernel, 2, NULL, globalWorkSize, localWorkSize, 0, NULL, NULL);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: Failed to run kernel, return %s\n", TranslateOpenCLError(err));
         return err;
     }
 
     // Wait until the queued kernel is completed by the device
     err = clFinish(ocl->commandQueue);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clFinish return %s\n", TranslateOpenCLError(err));
         return err;
     }
@@ -724,8 +654,7 @@ cl_uint ExecuteAddKernel(ocl_args_d_t *ocl, cl_uint width, cl_uint height)
 /*
  * "Read" the result buffer (mapping the buffer to the host memory address)
  */
-bool ReadAndVerify(ocl_args_d_t *ocl, cl_uint width, cl_uint height, cl_int *inputA, cl_int *inputB)
-{
+bool ReadAndVerify(ocl_args_d_t *ocl, cl_uint width, cl_uint height, cl_int *inputA, cl_int *inputB) {
     cl_int err = CL_SUCCESS;
     bool result = true;
 
@@ -733,35 +662,30 @@ bool ReadAndVerify(ocl_args_d_t *ocl, cl_uint width, cl_uint height, cl_int *inp
     // The map operation is blocking
     cl_int *resultPtr = (cl_int *)clEnqueueMapBuffer(ocl->commandQueue, ocl->dstMem, true, CL_MAP_READ, 0, sizeof(cl_uint) * width * height, 0, NULL, NULL, &err);
 
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clEnqueueMapBuffer returned %s\n", TranslateOpenCLError(err));
         return false;
     }
 
     // Call clFinish to guarantee that output region is updated
     err = clFinish(ocl->commandQueue);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clFinish returned %s\n", TranslateOpenCLError(err));
     }
 
     // We mapped dstMem to resultPtr, so resultPtr is ready and includes the kernel output !!!
     // Verify the results
     unsigned int size = width * height;
-    for (unsigned int k = 0; k < size; ++k)
-    {
-        if (resultPtr[k] != inputA[k] + inputB[k])
-        {
+    for (unsigned int k = 0; k < size; ++k) {
+        if (resultPtr[k] != inputA[k] + inputB[k]) {
             LogError("Verification failed at %d: (%d + %d = %d)\n", k, inputA[k], inputB[k], resultPtr[k]);
             result = false;
         }
     }
 
-     // Unmapped the output buffer before releasing it
+    // Unmapped the output buffer before releasing it
     err = clEnqueueUnmapMemObject(ocl->commandQueue, ocl->dstMem, resultPtr, 0, NULL, NULL);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clEnqueueUnmapMemObject returned %s\n", TranslateOpenCLError(err));
     }
 
@@ -776,8 +700,7 @@ bool ReadAndVerify(ocl_args_d_t *ocl, cl_uint width, cl_uint height, cl_int *inp
  *   - running OpenCL kernel
  *   - reading results of processing
  */
-int _tmain(int argc, TCHAR* argv[])
-{
+int _tmain(int argc, TCHAR* argv[]) {
     cl_int err;
     ocl_args_d_t ocl;
     cl_device_type deviceType = CL_DEVICE_TYPE_GPU;
@@ -790,8 +713,7 @@ int _tmain(int argc, TCHAR* argv[])
     cl_uint arrayHeight = 1024;
 
     //initialize Open CL objects (context, queue, etc.)
-    if (CL_SUCCESS != SetupOpenCL(&ocl, deviceType))
-    {
+    if (CL_SUCCESS != SetupOpenCL(&ocl, deviceType)) {
         return -1;
     }
 
@@ -801,8 +723,7 @@ int _tmain(int argc, TCHAR* argv[])
     cl_int* inputA  = (cl_int*)_aligned_malloc(optimizedSize, 4096);
     cl_int* inputB  = (cl_int*)_aligned_malloc(optimizedSize, 4096);
     cl_int* outputC = (cl_int*)_aligned_malloc(optimizedSize, 4096);
-    if (NULL == inputA || NULL == inputB || NULL == outputC)
-    {
+    if (NULL == inputA || NULL == inputB || NULL == outputC) {
         LogError("Error: _aligned_malloc failed to allocate buffers.\n");
         return -1;
     }
@@ -813,14 +734,12 @@ int _tmain(int argc, TCHAR* argv[])
 
     // Create OpenCL buffers from host memory
     // These buffers will be used later by the OpenCL kernel
-    if (CL_SUCCESS != CreateBufferArguments(&ocl, inputA, inputB, outputC, arrayWidth, arrayHeight))
-    {
+    if (CL_SUCCESS != CreateBufferArguments(&ocl, inputA, inputB, outputC, arrayWidth, arrayHeight)) {
         return -1;
     }
 
-     // Create and build the OpenCL program
-    if (CL_SUCCESS != CreateAndBuildProgram(&ocl))
-    {
+    // Create and build the OpenCL program
+    if (CL_SUCCESS != CreateAndBuildProgram(&ocl)) {
         return -1;
     }
 
@@ -828,15 +747,13 @@ int _tmain(int argc, TCHAR* argv[])
     // Each kernel can be called (enqueued) from the host part of OpenCL application.
     // To call the kernel, you need to create it from existing program.
     ocl.kernel = clCreateKernel(ocl.program, "Add", &err);
-    if (CL_SUCCESS != err)
-    {
+    if (CL_SUCCESS != err) {
         LogError("Error: clCreateKernel returned %s\n", TranslateOpenCLError(err));
         return -1;
     }
 
     // Passing arguments into OpenCL kernel.
-    if (CL_SUCCESS != SetKernelArguments(&ocl))
-    {
+    if (CL_SUCCESS != SetKernelArguments(&ocl)) {
         return -1;
     }
 
@@ -854,8 +771,7 @@ int _tmain(int argc, TCHAR* argv[])
     if (queueProfilingEnable)
         QueryPerformanceCounter(&performanceCountNDRangeStart);
     // Execute (enqueue) the kernel
-    if (CL_SUCCESS != ExecuteAddKernel(&ocl, arrayWidth, arrayHeight))
-    {
+    if (CL_SUCCESS != ExecuteAddKernel(&ocl, arrayWidth, arrayHeight)) {
         return -1;
     }
     if (queueProfilingEnable)
@@ -866,8 +782,7 @@ int _tmain(int argc, TCHAR* argv[])
     ReadAndVerify(&ocl, arrayWidth, arrayHeight, inputA, inputB);
 
     // retrieve performance counter frequency
-    if (queueProfilingEnable)
-    {
+    if (queueProfilingEnable) {
         QueryPerformanceFrequency(&perfFrequency);
         LogInfo("NDRange performance counter time %f ms.\n",
             1000.0f*(float)(performanceCountNDRangeStop.QuadPart - performanceCountNDRangeStart.QuadPart) / (float)perfFrequency.QuadPart);
