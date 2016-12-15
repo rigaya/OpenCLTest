@@ -504,21 +504,23 @@ int SetupOpenCL(ocl_args_d_t *ocl, cl_device_type deviceType) {
 int CreateAndBuildProgram(ocl_args_d_t *ocl) {
     cl_int err = CL_SUCCESS;
 
-    // Upload the OpenCL C source code from the input file to source
-    // The size of the C program is returned in sourceSize
-    char* source = NULL;
+    HMODULE hmodule = GetModuleHandle(NULL);
+    HRSRC hresource = nullptr;
+    HGLOBAL hresource_data = nullptr;
+    const char *source = nullptr;
     size_t src_size = 0;
-    err = ReadSourceFromFile("Template.cl", &source, &src_size);
-    if (CL_SUCCESS != err) {
-        LogError("Error: ReadSourceFromFile returned %s.\n", TranslateOpenCLError(err));
-        goto Finish;
+    if (   nullptr == (hresource = FindResource(hmodule, L"CLDATA", L"KERNEL_DATA"))
+        || nullptr == (hresource_data = LoadResource(hmodule, hresource))
+        || nullptr == (source = (const char *)LockResource(hresource_data))
+        || 0       == (src_size = SizeofResource(hmodule, hresource))) {
+        return CL_INVALID_VALUE;
     }
 
     // And now after you obtained a regular C string call clCreateProgramWithSource to create OpenCL program object.
     ocl->program = clCreateProgramWithSource(ocl->context, 1, (const char**)&source, &src_size, &err);
     if (CL_SUCCESS != err) {
         LogError("Error: clCreateProgramWithSource returned %s.\n", TranslateOpenCLError(err));
-        goto Finish;
+        return err;
     }
 
     // Build the program
@@ -543,12 +545,6 @@ int CreateAndBuildProgram(ocl_args_d_t *ocl) {
 
             LogError("Error happened during the build of OpenCL program.\nBuild log:%s", &build_log[0]);
         }
-    }
-
-Finish:
-    if (source) {
-        delete[] source;
-        source = NULL;
     }
 
     return err;

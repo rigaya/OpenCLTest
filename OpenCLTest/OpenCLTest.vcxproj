@@ -192,6 +192,9 @@
   <ItemGroup>
     <Intel_OpenCL_Build_Rules Include="Template.cl" />
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="OpenCLTest.rc" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="$(VCTargetsPath)\BuildCustomizations\IntelOpenCL.targets" />
