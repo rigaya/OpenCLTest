@@ -606,6 +606,14 @@ cl_uint SetKernelArguments(ocl_args_d_t *ocl) {
     return err;
 }
 
+int ceil_int_div(int i, int div) {
+    return (i + div - 1) / div;
+}
+
+int ceil_int(int i, int div) {
+    return ceil_int_div(i, div) * div;
+}
+
 
 /*
  * Execute the kernel
@@ -614,8 +622,8 @@ cl_uint ExecuteAddKernel(ocl_args_d_t *ocl, cl_uint width, cl_uint height) {
     cl_int err = CL_SUCCESS;
 
     // Define global iteration space for clEnqueueNDRangeKernel.
-    size_t globalWorkSize[2] ={ width, height };
-    size_t localWorkSize[2] ={ 1, 1 };
+    size_t localWorkSize[2]  = { 32, 1 };
+    size_t globalWorkSize[2] = { ceil_int(width, localWorkSize[0]), ceil_int(height, localWorkSize[0]) };
 
     // execute kernel
     err = clEnqueueNDRangeKernel(ocl->commandQueue, ocl->kernel, 2, NULL, globalWorkSize, localWorkSize, 0, NULL, NULL);
