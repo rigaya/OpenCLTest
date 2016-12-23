@@ -582,7 +582,7 @@ int CreateBufferArguments(ocl_args_d_t *ocl, cl_int* inputA, cl_int* inputB, cl_
 /*
  * Set kernel arguments
  */
-cl_uint SetKernelArguments(ocl_args_d_t *ocl) {
+cl_uint SetKernelArguments(ocl_args_d_t *ocl, cl_uint width, cl_uint height) {
     cl_int err = CL_SUCCESS;
 
     err  =  clSetKernelArg(ocl->kernel, 0, sizeof(cl_mem), (void *)&ocl->srcA);
@@ -603,7 +603,27 @@ cl_uint SetKernelArguments(ocl_args_d_t *ocl) {
         return err;
     }
 
+    err  = clSetKernelArg(ocl->kernel, 3, sizeof(cl_uint), (void *)&width);
+    if (CL_SUCCESS != err) {
+        LogError("Error: Failed to set argument width, returned %s\n", TranslateOpenCLError(err));
+        return err;
+    }
+
+    err  = clSetKernelArg(ocl->kernel, 4, sizeof(cl_uint), (void *)&height);
+    if (CL_SUCCESS != err) {
+        LogError("Error: Failed to set argument height, returned %s\n", TranslateOpenCLError(err));
+        return err;
+    }
+
     return err;
+}
+
+int ceil_int_div(int i, int div) {
+    return (i + div - 1) / div;
+}
+
+int ceil_int(int i, int div) {
+    return ceil_int_div(i, div) * div;
 }
 
 
@@ -614,8 +634,8 @@ cl_uint ExecuteAddKernel(ocl_args_d_t *ocl, cl_uint width, cl_uint height) {
     cl_int err = CL_SUCCESS;
 
     // Define global iteration space for clEnqueueNDRangeKernel.
-    size_t globalWorkSize[2] ={ width, height };
-    size_t localWorkSize[2] ={ 1, 1 };
+    size_t localWorkSize[2]  = { 32, 1 };
+    size_t globalWorkSize[2] = { ceil_int(width, localWorkSize[0]), ceil_int(height, localWorkSize[1]) };
 
     // execute kernel
     err = clEnqueueNDRangeKernel(ocl->commandQueue, ocl->kernel, 2, NULL, globalWorkSize, localWorkSize, 0, NULL, NULL);
@@ -730,7 +750,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 
 
     // Passing arguments into OpenCL kernel.
-    if (CL_SUCCESS != SetKernelArguments(&ocl)) {
+    if (CL_SUCCESS != SetKernelArguments(&ocl, arrayWidth, arrayHeight)) {
         return -1;
     }
 
