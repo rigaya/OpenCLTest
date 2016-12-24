@@ -37,6 +37,14 @@
 #define OPENCL_VERSION_1_2  1.2f
 #define OPENCL_VERSION_2_0  2.0f
 
+int ceil_int_div(int i, int div) {
+    return (i + div - 1) / div;
+}
+
+int ceil_int(int i, int div) {
+    return ceil_int_div(i, div) * div;
+}
+
 /* This function helps to create informative messages in
  * case when OpenCL errors occur. It returns a string
  * representation for an OpenCL error code.
@@ -556,20 +564,21 @@ int CreateAndBuildProgram(ocl_args_d_t *ocl) {
  */
 int CreateBufferArguments(ocl_args_d_t *ocl, cl_int* inputA, cl_int* inputB, cl_int* outputC, cl_uint arrayWidth, cl_uint arrayHeight) {
     cl_int err = CL_SUCCESS;
+    cl_uint optimizedSize = ceil_int(sizeof(cl_int) * arrayWidth * arrayHeight, 64);
 
-    ocl->srcA = clCreateBuffer(ocl->context, CL_MEM_READ_ONLY, sizeof(cl_uint) * arrayWidth * arrayHeight, nullptr, &err);
+    ocl->srcA = clCreateBuffer(ocl->context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, optimizedSize, inputA, &err);
     if (CL_SUCCESS != err) {
         LogError("Error: clCreateBuffer for srcA returned %s\n", TranslateOpenCLError(err));
         return err;
     }
 
-    ocl->srcB = clCreateBuffer(ocl->context, CL_MEM_READ_ONLY, sizeof(cl_uint) * arrayWidth * arrayHeight, nullptr, &err);
+    ocl->srcB = clCreateBuffer(ocl->context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, optimizedSize, inputB, &err);
     if (CL_SUCCESS != err) {
         LogError("Error: clCreateBuffer for srcB returned %s\n", TranslateOpenCLError(err));
         return err;
     }
 
-    ocl->dstMem = clCreateBuffer(ocl->context, CL_MEM_WRITE_ONLY, sizeof(cl_uint) * arrayWidth * arrayHeight, nullptr, &err);
+    ocl->dstMem = clCreateBuffer(ocl->context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, optimizedSize, outputC, &err);
     if (CL_SUCCESS != err) {
         LogError("Error: clCreateBuffer for dstMem returned %s\n", TranslateOpenCLError(err));
         return err;
@@ -618,15 +627,6 @@ cl_uint SetKernelArguments(ocl_args_d_t *ocl, cl_uint width, cl_uint height) {
     return err;
 }
 
-int ceil_int_div(int i, int div) {
-    return (i + div - 1) / div;
-}
-
-int ceil_int(int i, int div) {
-    return ceil_int_div(i, div) * div;
-}
-
-
 /*
  * Execute the kernel
  */
@@ -655,9 +655,9 @@ bool ReadAndVerify(ocl_args_d_t *ocl, cl_uint width, cl_uint height, cl_int *inp
     cl_int err = CL_SUCCESS;
     bool result = true;
 
-    err = clEnqueueReadBuffer(ocl->commandQueue, ocl->dstMem, CL_FALSE, 0, sizeof(cl_uint) * arrayWidth * arrayHeight, outputC, 0, nullptr, nullptr);
+    cl_int *ptrMapped = (cl_int *)clEnqueueMapBuffer(ocl->commandQueue, ocl->dstMem, CL_FALSE, CL_MAP_READ, 0, sizeof(cl_uint) * arrayWidth * arrayHeight, 0, NULL, NULL, &err);
     if (CL_SUCCESS != err) {
-        LogError("Error: clEnqueueReadBuffer for ocl->dstMem returned %s\n", TranslateOpenCLError(err));
+        LogError("Error: clEnqueueMapBuffer for ocl->dstMem returned %s\n", TranslateOpenCLError(err));
     }
 
     // Call clFinish to guarantee that output region is updated
@@ -669,10 +669,19 @@ bool ReadAndVerify(ocl_args_d_t *ocl, cl_uint width, cl_uint height, cl_int *inp
     // Verify the results
     unsigned int size = width * height;
     for (unsigned int k = 0; k < size; ++k) {
-        if (outputC[k] != inputA[k] + inputB[k]) {
-            LogError("Verification failed at %d: (%d + %d = %d)\n", k, inputA[k], inputB[k], outputC[k]);
+        if (ptrMapped[k] != inputA[k] + inputB[k]) {
+            LogError("Verification failed at %d: (%d + %d = %d)\n", k, inputA[k], inputB[k], ptrMapped[k]);
             result = false;
         }
+    }
+
+    err = clEnqueueUnmapMemObject(ocl->commandQueue, ocl->dstMem, ptrMapped, 0, NULL, NULL);
+    if (CL_SUCCESS != err) {
+        LogError("Error: clEnqueueUnmapMemObject for ocl->dstMem returned %s\n", TranslateOpenCLError(err));
+    }
+    err = clFinish(ocl->commandQueue);
+    if (CL_SUCCESS != err) {
+        LogError("Error: clFinish returned %s\n", TranslateOpenCLError(err));
     }
 
     return result;
@@ -704,10 +713,10 @@ int _tmain(int argc, TCHAR* argv[]) {
     }
 
     // allocate working buffers. 
-    cl_uint optimizedSize = sizeof(cl_int) * arrayWidth * arrayHeight;
-    cl_int* inputA  = (cl_int*)_aligned_malloc(optimizedSize, 64);
-    cl_int* inputB  = (cl_int*)_aligned_malloc(optimizedSize, 64);
-    cl_int* outputC = (cl_int*)_aligned_malloc(optimizedSize, 64);
+    cl_uint optimizedSize = ceil_int(sizeof(cl_int) * arrayWidth * arrayHeight, 64);
+    cl_int* inputA  = (cl_int*)_aligned_malloc(optimizedSize, 4096);
+    cl_int* inputB  = (cl_int*)_aligned_malloc(optimizedSize, 4096);
+    cl_int* outputC = (cl_int*)_aligned_malloc(optimizedSize, 4096);
     if (NULL == inputA || NULL == inputB || NULL == outputC) {
         LogError("Error: _aligned_malloc failed to allocate buffers.\n");
         return -1;
@@ -734,20 +743,34 @@ int _tmain(int argc, TCHAR* argv[]) {
     }
 
     //random input
-    generateInput(inputA, arrayWidth, arrayHeight);
-    generateInput(inputB, arrayWidth, arrayHeight);
-
-    err = clEnqueueWriteBuffer(ocl.commandQueue, ocl.srcA, CL_FALSE, 0, sizeof(cl_uint) * arrayWidth * arrayHeight, inputA, 0, nullptr, nullptr);
+    cl_int *ptrMappedA = (cl_int *)clEnqueueMapBuffer(ocl.commandQueue, ocl.srcA, CL_FALSE, CL_MAP_WRITE, 0, sizeof(cl_uint) * arrayWidth * arrayHeight, 0, NULL, NULL, &err);
     if (CL_SUCCESS != err) {
-        LogError("Error: clEnqueueWriteBuffer for ocl->srcA returned %s\n", TranslateOpenCLError(err));
+        LogError("Error: clEnqueueMapBuffer for ocl->srcA returned %s\n", TranslateOpenCLError(err));
+        return -1;
+    }
+    cl_int *ptrMappedB = (cl_int *)clEnqueueMapBuffer(ocl.commandQueue, ocl.srcB, CL_FALSE, CL_MAP_WRITE, 0, sizeof(cl_uint) * arrayWidth * arrayHeight, 0, NULL, NULL, &err);
+    if (CL_SUCCESS != err) {
+        LogError("Error: clEnqueueMapBuffer for ocl->srcB returned %s\n", TranslateOpenCLError(err));
+        return -1;
+    }
+    err = clFinish(ocl.commandQueue);
+    generateInput(ptrMappedA, arrayWidth, arrayHeight);
+    generateInput(ptrMappedB, arrayWidth, arrayHeight);
+
+    err = clEnqueueUnmapMemObject(ocl.commandQueue, ocl.srcA, ptrMappedA, 0, NULL, NULL);
+    if (CL_SUCCESS != err) {
+        LogError("Error: clEnqueueUnmapMemObject for ocl->srcA returned %s\n", TranslateOpenCLError(err));
         return err;
     }
-    err = clEnqueueWriteBuffer(ocl.commandQueue, ocl.srcB, CL_FALSE, 0, sizeof(cl_uint) * arrayWidth * arrayHeight, inputB, 0, nullptr, nullptr);
+    err = clEnqueueUnmapMemObject(ocl.commandQueue, ocl.srcB, ptrMappedB, 0, NULL, NULL);
     if (CL_SUCCESS != err) {
-        LogError("Error: clEnqueueWriteBuffer for ocl->srcA returned %s\n", TranslateOpenCLError(err));
+        LogError("Error: clEnqueueUnmapMemObject for ocl->srcB returned %s\n", TranslateOpenCLError(err));
         return err;
     }
-
+    err = clFinish(ocl.commandQueue);
+    if (CL_SUCCESS != err) {
+        LogError("Error: clFinish returned %s\n", TranslateOpenCLError(err));
+    }
 
     // Passing arguments into OpenCL kernel.
     if (CL_SUCCESS != SetKernelArguments(&ocl, arrayWidth, arrayHeight)) {
