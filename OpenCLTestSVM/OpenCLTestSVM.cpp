@@ -611,9 +611,11 @@ bool ReadAndVerify(ocl_args_d_t *ocl, cl_uint width, cl_uint height, cl_int *inp
     cl_int err = CL_SUCCESS;
     bool result = true;
 
-    err = clEnqueueSVMMap(ocl->commandQueue, CL_FALSE, CL_MAP_READ, outputC, sizeof(cl_uint) * arrayWidth * arrayHeight, 0, NULL, NULL);
-    if (CL_SUCCESS != err) {
-        LogError("Error: clEnqueueMapBuffer for ocl->dstMem returned %s\n", TranslateOpenCLError(err));
+    if (!ocl->svmFineBuffer) {
+        err = clEnqueueSVMMap(ocl->commandQueue, CL_FALSE, CL_MAP_READ, outputC, sizeof(cl_uint) * arrayWidth * arrayHeight, 0, NULL, NULL);
+        if (CL_SUCCESS != err) {
+            LogError("Error: clEnqueueMapBuffer for ocl->dstMem returned %s\n", TranslateOpenCLError(err));
+        }
     }
 
     // Call clFinish to guarantee that output region is updated
@@ -631,9 +633,11 @@ bool ReadAndVerify(ocl_args_d_t *ocl, cl_uint width, cl_uint height, cl_int *inp
         }
     }
 
-    err = clEnqueueSVMUnmap(ocl->commandQueue, outputC, 0, NULL, NULL);
-    if (CL_SUCCESS != err) {
-        LogError("Error: clEnqueueUnmapMemObject for ocl->dstMem returned %s\n", TranslateOpenCLError(err));
+    if (!ocl->svmFineBuffer) {
+        err = clEnqueueSVMUnmap(ocl->commandQueue, outputC, 0, NULL, NULL);
+        if (CL_SUCCESS != err) {
+            LogError("Error: clEnqueueUnmapMemObject for ocl->dstMem returned %s\n", TranslateOpenCLError(err));
+        }
     }
     err = clFinish(ocl->commandQueue);
     if (CL_SUCCESS != err) {
@@ -674,9 +678,10 @@ int _tmain(int argc, TCHAR* argv[]) {
 
     // allocate working buffers. 
     cl_uint nSize = sizeof(cl_int) * arrayWidth * arrayHeight;
-    cl_int* inputA  = (cl_int*)clSVMAlloc(ocl.context, CL_MEM_READ_ONLY,  nSize, 0);
-    cl_int* inputB  = (cl_int*)clSVMAlloc(ocl.context, CL_MEM_READ_ONLY,  nSize, 0);
-    cl_int* outputC = (cl_int*)clSVMAlloc(ocl.context, CL_MEM_WRITE_ONLY, nSize, 0);
+    cl_svm_mem_flags svm_fine_buf_flags = (ocl.svmFineBuffer) ? CL_MEM_SVM_FINE_GRAIN_BUFFER : 0;
+    cl_int* inputA  = (cl_int*)clSVMAlloc(ocl.context, CL_MEM_READ_ONLY  | svm_fine_buf_flags,  nSize, 0);
+    cl_int* inputB  = (cl_int*)clSVMAlloc(ocl.context, CL_MEM_READ_ONLY  | svm_fine_buf_flags,  nSize, 0);
+    cl_int* outputC = (cl_int*)clSVMAlloc(ocl.context, CL_MEM_WRITE_ONLY | svm_fine_buf_flags, nSize, 0);
     if (NULL == inputA || NULL == inputB || NULL == outputC) {
         LogError("Error: _aligned_malloc failed to allocate buffers.\n");
         return -1;
@@ -697,33 +702,37 @@ int _tmain(int argc, TCHAR* argv[]) {
     }
 
     //random input
-    err = clEnqueueSVMMap(ocl.commandQueue, CL_FALSE, CL_MAP_WRITE, inputA, sizeof(cl_uint) * arrayWidth * arrayHeight, 0, NULL, NULL);
-    if (CL_SUCCESS != err) {
-        LogError("Error: clEnqueueMapBuffer for ocl->srcA returned %s\n", TranslateOpenCLError(err));
-        return -1;
+    if (!ocl.svmFineBuffer) {
+        err = clEnqueueSVMMap(ocl.commandQueue, CL_FALSE, CL_MAP_WRITE, inputA, sizeof(cl_uint) * arrayWidth * arrayHeight, 0, NULL, NULL);
+        if (CL_SUCCESS != err) {
+            LogError("Error: clEnqueueMapBuffer for ocl->srcA returned %s\n", TranslateOpenCLError(err));
+            return -1;
+        }
+        err = clEnqueueSVMMap(ocl.commandQueue, CL_FALSE, CL_MAP_WRITE, inputB, sizeof(cl_uint) * arrayWidth * arrayHeight, 0, NULL, NULL);
+        if (CL_SUCCESS != err) {
+            LogError("Error: clEnqueueMapBuffer for ocl->srcB returned %s\n", TranslateOpenCLError(err));
+            return -1;
+        }
+        err = clFinish(ocl.commandQueue);
     }
-    err = clEnqueueSVMMap(ocl.commandQueue, CL_FALSE, CL_MAP_WRITE, inputB, sizeof(cl_uint) * arrayWidth * arrayHeight, 0, NULL, NULL);
-    if (CL_SUCCESS != err) {
-        LogError("Error: clEnqueueMapBuffer for ocl->srcB returned %s\n", TranslateOpenCLError(err));
-        return -1;
-    }
-    err = clFinish(ocl.commandQueue);
     generateInput(inputA, arrayWidth, arrayHeight);
     generateInput(inputB, arrayWidth, arrayHeight);
 
-    err = clEnqueueSVMUnmap(ocl.commandQueue, inputA, 0, NULL, NULL);
-    if (CL_SUCCESS != err) {
-        LogError("Error: clEnqueueUnmapMemObject for ocl->srcA returned %s\n", TranslateOpenCLError(err));
-        return err;
-    }
-    err = clEnqueueSVMUnmap(ocl.commandQueue, inputB, 0, NULL, NULL);
-    if (CL_SUCCESS != err) {
-        LogError("Error: clEnqueueUnmapMemObject for ocl->srcB returned %s\n", TranslateOpenCLError(err));
-        return err;
-    }
-    err = clFinish(ocl.commandQueue);
-    if (CL_SUCCESS != err) {
-        LogError("Error: clFinish returned %s\n", TranslateOpenCLError(err));
+    if (!ocl.svmFineBuffer) {
+        err = clEnqueueSVMUnmap(ocl.commandQueue, inputA, 0, NULL, NULL);
+        if (CL_SUCCESS != err) {
+            LogError("Error: clEnqueueUnmapMemObject for ocl->srcA returned %s\n", TranslateOpenCLError(err));
+            return err;
+        }
+        err = clEnqueueSVMUnmap(ocl.commandQueue, inputB, 0, NULL, NULL);
+        if (CL_SUCCESS != err) {
+            LogError("Error: clEnqueueUnmapMemObject for ocl->srcB returned %s\n", TranslateOpenCLError(err));
+            return err;
+        }
+        err = clFinish(ocl.commandQueue);
+        if (CL_SUCCESS != err) {
+            LogError("Error: clFinish returned %s\n", TranslateOpenCLError(err));
+        }
     }
 
     // Passing arguments into OpenCL kernel.
