@@ -694,7 +694,7 @@ bool ReadAndVerify(ocl_args_d_t *ocl, cl_float *input, cl_float* output, int arr
     cl_int err = CL_SUCCESS;
     bool result = true;
 
-    cl_int *ptrMapped = (cl_int *)clEnqueueMapBuffer(ocl->commandQueue, ocl->dstMem, CL_FALSE, CL_MAP_READ, 0, sizeof(cl_float) * arrayPitch * arrayHeight, 0, NULL, NULL, &err);
+    cl_float *ptrMapped = (cl_float *)clEnqueueMapBuffer(ocl->commandQueue, ocl->dstMem, CL_FALSE, CL_MAP_READ, 0, sizeof(cl_float) * arrayPitch * arrayHeight, 0, NULL, NULL, &err);
     if (CL_SUCCESS != err) {
         LogError("Error: clEnqueueMapBuffer for ocl->dstMem returned %s\n", TranslateOpenCLError(err));
     }
@@ -707,7 +707,7 @@ bool ReadAndVerify(ocl_args_d_t *ocl, cl_float *input, cl_float* output, int arr
 
     // Verify the results
     for (int y = 0; y < arrayHeight; y++) {
-        for (int x = 0; x < arrayPitch; x++) {
+        for (int x = 0; x < arrayWidth; x++) {
             const float weight[] = {
                 1.0f, 2.0f, 1.0f,
                 2.0f, 4.0f, 2.0f,
@@ -727,7 +727,7 @@ bool ReadAndVerify(ocl_args_d_t *ocl, cl_float *input, cl_float* output, int arr
                 }
             }
             float val = sump / sumw;
-            if ((val - output[y * arrayPitch + x]) / val > 1e-6) {
+            if (std::abs((val - ptrMapped[y * arrayPitch + x]) / val) > 1e-6) {
                 LogError("Verification failed at (%d,%d): %e:%e\n", x, y, val, output[y * arrayPitch + x]);
                 result = false;
             }
