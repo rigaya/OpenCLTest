@@ -19,8 +19,12 @@
  * Intel Corporation is the author of the Materials, and requests that all
  * problem reports or change requests be submitted to it directly
  *****************************************************************************/
-
+ 
+#if USE_IMAGE
+__kernel void convolve(__read_only image2d_t imgIn, __global float* pOut, int width, int pitch, int height) {
+#else
 __kernel void convolve(__global float* pIn, __global float* pOut, int width, int pitch, int height) {
+#endif
     const int x = get_global_id(0);
     const int y = get_global_id(1);
 
@@ -39,7 +43,11 @@ __kernel void convolve(__global float* pIn, __global float* pOut, int width, int
                 int xi = clamp(x+i, 0, width-1);
                 float w = weight[iw];
                 sumw += w;
+#if USE_IMAGE
+                sump += w * read_imagef(imgIn, (int2)(xi,yj)).x;
+#else
                 sump += w * pIn[yj * pitch + xi];
+#endif
                 iw++;
             }
         }

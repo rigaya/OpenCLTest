@@ -32,6 +32,7 @@
  //for perf. counters
 #include <Windows.h>
 
+#define USE_IMAGE 1
 
 // Macros for OpenCL versions
 #define OPENCL_VERSION_1_2  1.2f
@@ -148,6 +149,9 @@ struct ocl_args_d_t {
 
     // Objects that are specific for algorithm implemented in this sample
     cl_mem           srcMem;            // hold first source buffer
+#if USE_IMAGE
+    cl_mem           srcImg;            // hold first source buffer
+#endif
     cl_mem           dstMem;            // hold destination buffer
 };
 
@@ -161,6 +165,9 @@ ocl_args_d_t::ocl_args_d_t() :
     deviceVersion(OPENCL_VERSION_1_2),
     compilerVersion(OPENCL_VERSION_1_2),
     srcMem(NULL),
+#if USE_IMAGE
+    srcImg(NULL),
+#endif
     dstMem(NULL) {
 }
 
@@ -196,6 +203,14 @@ ocl_args_d_t::~ocl_args_d_t() {
             LogError("Error: clReleaseMemObject returned '%s'.\n", TranslateOpenCLError(err));
         }
     }
+#if USE_IMAGE
+    if (srcImg) {
+        err = clReleaseMemObject(srcImg);
+        if (CL_SUCCESS != err) {
+            LogError("Error: clReleaseMemObject returned '%s'.\n", TranslateOpenCLError(err));
+        }
+    }
+#endif
     if (dstMem) {
         err = clReleaseMemObject(dstMem);
         if (CL_SUCCESS != err) {
@@ -531,7 +546,11 @@ int CreateAndBuildProgram(ocl_args_d_t *ocl) {
     // but there are also other possibilities when program consist of several parts,
     // some of which are libraries, and you may want to consider using clCompileProgram and clLinkProgram as
     // alternatives.
-    err = clBuildProgram(ocl->program, 1, &ocl->device, "", NULL, NULL);
+    std::string options = "";
+#if USE_IMAGE
+    options += " -DUSE_IMAGE=1";
+#endif
+    err = clBuildProgram(ocl->program, 1, &ocl->device, options.c_str(), NULL, NULL);
     if (CL_SUCCESS != err) {
         LogError("Error: clBuildProgram() for source program returned %s.\n", TranslateOpenCLError(err));
 
@@ -567,6 +586,29 @@ int CreateBufferArguments(ocl_args_d_t *ocl, cl_float* input, cl_float* output, 
         return err;
     }
 
+#if USE_IMAGE
+    cl_image_format format;
+    format.image_channel_order = CL_R;
+    format.image_channel_data_type = CL_FLOAT;
+    cl_image_desc img_desc;
+    img_desc.image_type = CL_MEM_OBJECT_IMAGE2D;
+    img_desc.image_width = arrayWidth;
+    img_desc.image_height = arrayHeight;
+    img_desc.image_depth = 0;
+    img_desc.image_array_size = 0;
+    img_desc.image_row_pitch = arrayPitch * sizeof(cl_float);
+    img_desc.image_slice_pitch = 0;
+    img_desc.num_mip_levels = 0;
+    img_desc.num_samples = 0;
+    img_desc.buffer = 0;
+    img_desc.mem_object = ocl->srcMem;
+    ocl->srcImg = clCreateImage(ocl->context, CL_MEM_READ_ONLY, &format, &img_desc, nullptr, &err);
+    if (CL_SUCCESS != err) {
+        LogError("Error: clCreateImage for srcMem returned %s\n", TranslateOpenCLError(err));
+        return err;
+    }
+#endif
+
     ocl->dstMem = clCreateBuffer(ocl->context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, nSize, output, &err);
     if (CL_SUCCESS != err) {
         LogError("Error: clCreateBuffer for dstMem returned %s\n", TranslateOpenCLError(err));
@@ -583,11 +625,19 @@ int CreateBufferArguments(ocl_args_d_t *ocl, cl_float* input, cl_float* output, 
 cl_uint SetKernelArguments(ocl_args_d_t *ocl, int arrayWidth, int arrayPitch, int arrayHeight) {
     cl_int err = CL_SUCCESS;
 
+#if USE_IMAGE
+    err  =  clSetKernelArg(ocl->kernel, 0, sizeof(cl_mem), (void *)&ocl->srcImg);
+    if (CL_SUCCESS != err) {
+        LogError("error: Failed to set argument srcImg, returned %s\n", TranslateOpenCLError(err));
+        return err;
+}
+#else
     err  =  clSetKernelArg(ocl->kernel, 0, sizeof(cl_mem), (void *)&ocl->srcMem);
     if (CL_SUCCESS != err) {
         LogError("error: Failed to set argument srcMem, returned %s\n", TranslateOpenCLError(err));
         return err;
     }
+#endif
 
     err  = clSetKernelArg(ocl->kernel, 1, sizeof(cl_mem), (void *)&ocl->dstMem);
     if (CL_SUCCESS != err) {
@@ -752,19 +802,40 @@ int _tmain(int argc, TCHAR* argv[]) {
     }
 
     //random input
+#if USE_IMAGE
+    size_t origin[3] ={ 0, 0, 0 };
+    size_t region[3] ={ (size_t)arrayWidth, (size_t)arrayHeight, 1 };
+    size_t image_row_pitch = 0;
+    size_t image_slice_picth = 0;
+    cl_float *ptrMapped = (cl_float *)clEnqueueMapImage(ocl.commandQueue, ocl.srcImg, CL_FALSE, CL_MAP_WRITE,
+        origin, region, &image_row_pitch, &image_slice_picth, 0, NULL, NULL, &err);
+    if (CL_SUCCESS != err) {
+        LogError("Error: clEnqueueMapImage for ocl->srcImg returned %s\n", TranslateOpenCLError(err));
+        return -1;
+    }
+#else
     cl_float *ptrMapped = (cl_float *)clEnqueueMapBuffer(ocl.commandQueue, ocl.srcMem, CL_FALSE, CL_MAP_WRITE, 0, sizeof(cl_float) * arrayPitch * arrayHeight, 0, NULL, NULL, &err);
     if (CL_SUCCESS != err) {
         LogError("Error: clEnqueueMapBuffer for ocl->srcMem returned %s\n", TranslateOpenCLError(err));
         return -1;
     }
+#endif
     err = clFinish(ocl.commandQueue);
     generateInput(ptrMapped, arrayWidth, arrayPitch, arrayHeight);
 
+#if USE_IMAGE
+    err = clEnqueueUnmapMemObject(ocl.commandQueue, ocl.srcImg, ptrMapped, 0, NULL, NULL);
+    if (CL_SUCCESS != err) {
+        LogError("Error: clEnqueueUnmapMemObject for ocl->srcImg returned %s\n", TranslateOpenCLError(err));
+        return err;
+    }
+#else
     err = clEnqueueUnmapMemObject(ocl.commandQueue, ocl.srcMem, ptrMapped, 0, NULL, NULL);
     if (CL_SUCCESS != err) {
         LogError("Error: clEnqueueUnmapMemObject for ocl->srcMem returned %s\n", TranslateOpenCLError(err));
         return err;
     }
+#endif
     err = clFinish(ocl.commandQueue);
     if (CL_SUCCESS != err) {
         LogError("Error: clFinish returned %s\n", TranslateOpenCLError(err));
