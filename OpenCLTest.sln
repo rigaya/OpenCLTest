@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OpenCLTest", "OpenCLTest\Op
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OpenCLTestSVM", "OpenCLTestSVM\OpenCLTestSVM.vcxproj", "{3CCE88B3-D287-44D7-ADD9-24C1BB88E1E2}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OpenCLTestConvolve", "OpenCLTestConvolve\OpenCLTestConvolve.vcxproj", "{5BE233BC-0772-4734-9FDA-3E705131C00A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -31,6 +33,14 @@ Global
 		{3CCE88B3-D287-44D7-ADD9-24C1BB88E1E2}.Release|x64.Build.0 = Release|x64
 		{3CCE88B3-D287-44D7-ADD9-24C1BB88E1E2}.Release|x86.ActiveCfg = Release|Win32
 		{3CCE88B3-D287-44D7-ADD9-24C1BB88E1E2}.Release|x86.Build.0 = Release|Win32
+		{5BE233BC-0772-4734-9FDA-3E705131C00A}.Debug|x64.ActiveCfg = Debug|x64
+		{5BE233BC-0772-4734-9FDA-3E705131C00A}.Debug|x64.Build.0 = Debug|x64
+		{5BE233BC-0772-4734-9FDA-3E705131C00A}.Debug|x86.ActiveCfg = Debug|Win32
+		{5BE233BC-0772-4734-9FDA-3E705131C00A}.Debug|x86.Build.0 = Debug|Win32
+		{5BE233BC-0772-4734-9FDA-3E705131C00A}.Release|x64.ActiveCfg = Release|x64
+		{5BE233BC-0772-4734-9FDA-3E705131C00A}.Release|x64.Build.0 = Release|x64
+		{5BE233BC-0772-4734-9FDA-3E705131C00A}.Release|x86.ActiveCfg = Release|Win32
+		{5BE233BC-0772-4734-9FDA-3E705131C00A}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
